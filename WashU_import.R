@@ -14,3 +14,4 @@ Weight...21 = col_double(), Weight...30 = col_double()))
 WASHU_tidied <- write_csv(file = "WASHU_tidied.csv")
 WASHU_tidied <- write_csv(WASHU_ALL_CLEAN, file = "WASHU_tidied.csv")
 WASHU_tidied <- write_csv(WASHU_ALL_Clean, file = "WASHU_tidied.csv")
+
