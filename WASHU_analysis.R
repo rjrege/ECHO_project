@@ -40,3 +40,5 @@ paat_rvet_36 %>%
 paat_rvet_36_aov <- aov(PAAT_RVET_36 ~ `Shenan (0=No BPD, 1= BPD, 4=dead, transfer, withdrew)`, data = paat_rvet_36)
 
 summary(paat_rvet_36_aov)  
+#wilberdingtrain
+
