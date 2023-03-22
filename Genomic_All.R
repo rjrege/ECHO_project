@@ -72,13 +72,14 @@ final_keep_this <- rbind(variants_last_not_210059, variants_last_210059) %>%
   arrange(id)
 
 geno_data <- final_keep_this %>%
-  select(-id) %>%
-  as.snp.data()
+  #select(-id) %>%
+  as.data.frame()
 
 pheno_data <- read_csv("pheno_data.csv") %>%
   filter(PROP %in% final_keep_this$id) %>%
   mutate_all( ~ ifelse(is.na(.x), median(.x, na.rm = T), .)) %>%
-  rename(id = PROP)
+  rename(id = PROP) %>%
+  as.data.frame()
 
 #write csv for kinships
 id_nums <- pheno_data %>%
@@ -90,11 +91,7 @@ kinship_data <- read_csv("kinships.csv") %>%
   column_to_rownames(var="...1") %>%
   as.matrix()
 
-pheno_data_TAPSE_36 <- pheno_data %>%
-  select(-PAAT_36, -PAAT_RVET_36) %>%
-  as.data.frame()
-
-out_TAPSE_36 <- FFBSKAT(formula = TAPSE_36 ~ GA + BW + Race + Ethnicity + Sex, phenodata = pheno_data_TAPSE_36, genodata = final_keep_this, kin = kinship_data)
+out_TAPSE_36 <- FFBSKAT(formula = TAPSE_36 ~ GA + BW + Race + Ethnicity + Sex, phenodata = pheno_data, genodata = final_keep_this, kin = kinship_data)
 out <- FFBSKAT(trait ~ age + sex, phenodata, genodata, kin)
 #test stuff, ignore
 data(example.data) 
