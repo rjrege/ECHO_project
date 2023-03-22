@@ -2,9 +2,7 @@ library(tidyverse)
 library(hablar)
 library(FREGAT)
 
-WASHU_all_weeks <- read_csv(file = "WASHU_all_Weeks.csv")
 Raw_Annotation <- read_rds(file = "Wilberding_BPD_noannot_chr_hg38_cardio.rds")
-bed <- read.table("gene_list_50kbpad.bed",header = FALSE, sep="\t",stringsAsFactors=FALSE, quote="")
 
 Genotypes <- Raw_Annotation[["gt"]]
 Fix <- Raw_Annotation[["fix"]] %>%
@@ -48,7 +46,7 @@ updated_keep_this <- keep_this %>%
   mutate(new_geno = 12345)
 
 # imputes the NA values
-for (i in 1:length(updated_keep_this$new_geno)) {
+for (i in 1:length(updated_keep_this$gt_GT)) {
   
   if(is.na(updated_keep_this$gt_GT[i])) {
     updated_keep_this$new_geno[i] <- sample(c(0, 1, 2), size = 1, replace = TRUE, prob = c(updated_keep_this$homo_ref[i], updated_keep_this$hetero[i], updated_keep_this$homo_alt[i]))
@@ -57,28 +55,47 @@ for (i in 1:length(updated_keep_this$new_geno)) {
 }
 
 # Why are there still POS with insane amounts of entries? Also what are the duplicates in POS?
-final_keep_this <- updated_keep_this %>%
+variants_last_210059 <- updated_keep_this %>%
   mutate(geno = getGene(gt_GT)) %>%
-  select(-gt_GT, -new_geno) %>%
-  group_by(POS, ChromKey)
+  select(id, POS, ChromKey, geno) %>%
+  filter(id == 210059) %>%
+  distinct(POS, .keep_all = TRUE)
 
-colMeans(is.na(keep_this))
-  
-  #filter(POS == 237456575) 
+variants_last_not_210059 <- updated_keep_this %>%
+  mutate(geno = getGene(gt_GT)) %>%
+  select(id, POS, ChromKey, geno) %>%
+  filter(id != 210059)
 
-#%>%
- # filter(CHROM == 'chr1')
- # filter(gt_GT == '0/0' | gt_GT == '0/1' | gt_GT == '1/1') %>%
-  #mutate(geno = getGene(gt_GT)) %>%
-  #mutate(id = substr(Indiv, 1, 6)) %>%
-  #select(geno, everything()) %>%
-  #select(id, geno, POS, CHROM) %>%
-  group_by(gt_GT) %>%
-  summarize(num = n())
-  #arrange(num)
+final_keep_this <- rbind(variants_last_not_210059, variants_last_210059) %>%
+  select(-ChromKey) %>%
+  pivot_wider(names_from = c(POS), values_from = geno) %>%
+  arrange(id)
 
-table(Genotypes$gt_GT)
+geno_data <- final_keep_this %>%
+  select(-id) %>%
+  as.snp.data()
 
+pheno_data <- read_csv("pheno_data.csv") %>%
+  filter(PROP %in% final_keep_this$id) %>%
+  mutate_all( ~ ifelse(is.na(.x), median(.x, na.rm = T), .)) %>%
+  rename(id = PROP)
+
+#write csv for kinships
+id_nums <- pheno_data %>%
+  select(PROP)
+write_csv(id_nums, "id_nums.csv")
+
+kinship_data <- read_csv("kinships.csv") %>%
+  remove_rownames %>% 
+  column_to_rownames(var="...1") %>%
+  as.matrix()
+
+pheno_data_TAPSE_36 <- pheno_data %>%
+  select(-PAAT_36, -PAAT_RVET_36) %>%
+  as.data.frame()
+
+out_TAPSE_36 <- FFBSKAT(formula = TAPSE_36 ~ GA + BW + Race + Ethnicity + Sex, phenodata = pheno_data_TAPSE_36, genodata = final_keep_this, kin = kinship_data)
+out <- FFBSKAT(trait ~ age + sex, phenodata, genodata, kin)
 #test stuff, ignore
 data(example.data) 
 View(genodata)
