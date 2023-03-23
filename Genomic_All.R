@@ -94,10 +94,12 @@ kinship_data <- read_csv("kinships.csv") %>%
 out_TAPSE_36 <- FFBSKAT(formula = TAPSE_36 ~ GA + BW + Race + Ethnicity + Sex, phenodata = pheno_data, genodata = final_keep_this, kin = kinship_data)
 out <- FFBSKAT(trait ~ age + sex, phenodata, genodata, kin)
 #test stuff, ignore
+
 data(example.data) 
 View(genodata)
 View(phenodata)
 View(kin)
+View(snpdata)
 
 write_csv(keep_this, file = "temp_genotypes_table.csv")
 
