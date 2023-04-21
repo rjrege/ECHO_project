@@ -1,6 +1,6 @@
 library(tidyverse)
 library(hablar)
-library(FREGAT)
+library(famSKATRC)
 
 Raw_Annotation <- read_rds(file = "Wilberding_BPD_noannot_chr_hg38_cardio.rds")
 
@@ -72,8 +72,9 @@ final_keep_this <- rbind(variants_last_not_210059, variants_last_210059) %>%
   arrange(id)
 
 geno_data <- final_keep_this %>%
-  #select(-id) %>%
-  as.data.frame()
+  select(-id)
+
+final_geno_data <- apply(geno_data, 2, as.numeric)
 
 pheno_data <- read_csv("pheno_data.csv") %>%
   filter(PROP %in% final_keep_this$id) %>%
@@ -83,7 +84,7 @@ pheno_data <- read_csv("pheno_data.csv") %>%
 
 #write csv for kinships
 id_nums <- pheno_data %>%
-  select(PROP)
+  select(id)
 write_csv(id_nums, "id_nums.csv")
 
 kinship_data <- read_csv("kinships.csv") %>%
@@ -91,18 +92,43 @@ kinship_data <- read_csv("kinships.csv") %>%
   column_to_rownames(var="...1") %>%
   as.matrix()
 
-out_TAPSE_36 <- FFBSKAT(formula = TAPSE_36 ~ GA + BW + Race + Ethnicity + Sex, phenodata = pheno_data, genodata = final_keep_this, kin = kinship_data)
-out <- FFBSKAT(trait ~ age + sex, phenodata, genodata, kin)
+wuweights_r <- function(maf) ifelse(maf>0, dbeta(maf,1,25), 0)
+wuweights_c <- function(maf) ifelse(maf>0, dbeta(maf,0.5,0.5), 0)
+
+famSKAT_TAPSE <- famSKAT_RC(PHENO = pheno_data[,"TAPSE_36"], genotypes = as.matrix(final_geno_data), binomialimpute=TRUE, id = id_nums$id, fullkins = kinship_data, maf = 0.05, sqrtweights_c=wuweights_c, sqrtweights_r=wuweights_r, phi = 1)
+
+#SKAT
+TAPSE_36_data <- as.matrix(pheno_data%>%select(TAPSE_36))
+covariates <- as.matrix(pheno_data%>%select(GA:Sex))
+SKAT_TAPSE_36_data <- list(TAPSE_36_data, covariates, final_geno_data, kinship_data)
+names(SKAT_TAPSE_36_data) <- c('pheno', 'covars', 'geno', 'kin')
+SKAT_TAPSE_36_test <- SKAT_NULL_emmaX(pheno ~ covars, K=kin, data=SKAT_TAPSE_36_data)
+
 #test stuff, ignore
 
-data(example.data) 
-View(genodata)
-View(phenodata)
-View(kin)
-View(snpdata)
+data("SKAT.fam.example")
+K = SKAT.fam.example$K
+Z = SKAT.fam.example$Z
+sample_data_traits <- SKAT.fam.example$X
+obj<-SKAT_NULL_emmaX(y ~ X, K=K, data=SKAT.fam.example)
+SKAT(Z, obj)$p.value
 
+library(kinship2)
+sample.ped.geno <- process_data()
+KIN = kinship(sample.ped.geno$IID, sample.ped.geno$FA, sample.ped.geno$MO)
+IID = sample.ped.geno$IID
+wuweights_r <- function(maf) ifelse(maf>0, dbeta(maf,1,25), 0)
+wuweights_c <- function(maf) ifelse(maf>0, dbeta(maf,0.5,0.5), 0)
+
+sample.ped.geno[,"Phenotype"]
+P_VALUES <- famSKAT_RC(PHENO=sample.ped.geno[,"Phenotype"],genotypes=as.matrix(
+  sample.ped.geno[,7:ncol(sample.ped.geno)]), binomialimpute=TRUE,
+  id=IID,fullkins=KIN,maf=0.05, sqrtweights_c=wuweights_c,
+  sqrtweights_r=wuweights_r, phi = c(0,0.2,0.5,0.9))
+print(P_VALUES)
+test_geno <- as.matrix(
+  sample.ped.geno[,7:ncol(sample.ped.geno)])
 write_csv(keep_this, file = "temp_genotypes_table.csv")
-
 
 getGene <- function(x){
   
