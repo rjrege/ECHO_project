@@ -6,7 +6,10 @@ library(purrr)
 Raw_Annotation <- read_rds(file = "Wilberding_BPD_noannot_chr_hg38_cardio.rds")
 bed <- read.table(file = "gene_list_50kbpad.bed", as.is = TRUE, sep = '\t')
 
+#genotypes of individuals
 Genotypes <- Raw_Annotation[["gt"]]
+
+#variants information
 Fix <- Raw_Annotation[["fix"]] %>%
   select(POS, AF, ChromKey, CHROM) %>%
   group_by(POS, ChromKey) %>%
@@ -22,14 +25,16 @@ Fix <- Raw_Annotation[["fix"]] %>%
   #select(-AF) %>%
   arrange(POS)
 
+# adds BED file information
 updated_Fix <- addGene(Fix, bed)
 
+# combines BED/variant info into genotype info
 Genotypes_new <- left_join(updated_Fix, Genotypes, by = c("ChromKey", "POS")) %>%
   filter(is.na(gt_GT) | gt_GT != '0/.') %>% 
   filter(is.na(gt_GT) | gt_GT != '1/.') %>%
   filter(is.na(gt_GT) | gt_GT != './1')
 
-
+# cleans up ID names
 keep_this <- Genotypes_new %>%
   mutate(id = substr(Indiv, 1, 6)) %>%
   select(id, everything()) %>%
@@ -44,11 +49,16 @@ removed_POS_list <- keep_this %>%
   arrange(prop) %>%
   filter(prop <= 0.2) %>%
   select(POS, ChromKey)
+
 #takes out NA POS greater than 20%
 updated_keep_this <- keep_this %>%
   filter(POS %in% removed_POS_list$POS) %>%
   mutate(new_geno = 12345)
 
+updated_keep_this %>%
+  group_by(POS, ChromKey) %>%
+  summarize(prop = sum(is.na(gt_GT)) / n()) %>%
+  arrange(desc(prop))
 # imputes the NA values
 for (i in 1:length(updated_keep_this$gt_GT)) {
   
@@ -72,19 +82,20 @@ variants_last_not_210059 <- updated_keep_this %>%
 
 final_keep_this <- rbind(variants_last_not_210059, variants_last_210059) %>%
   select(-ChromKey) 
+# array is 1414 by 89 --> complete, tidied comprehensive gene data here (final_keep_this)
 
 snp_info <- final_keep_this %>%
   select(-id, -geno) %>%
   distinct()
 
 #%>%
-  pivot_wider(names_from = c(POS), values_from = geno) %>%
-  arrange(id)
+#  pivot_wider(names_from = c(POS), values_from = geno) %>%
+#  arrange(id)
 
 geno_data <- final_keep_this %>%
   select(-id)
 
-final_geno_data <- apply(geno_data, 2, as.numeric)
+#final_geno_data <- apply(geno_data, 2, as.numeric)
 
 pheno_data <- read_csv("pheno_data.csv") %>%
   filter(PROP %in% final_keep_this$id) %>%
